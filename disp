@@ -1,0 +1,196 @@
+#include <SPI.h>              //Library for using SPI Communication 
+#include <mcp2515.h>          //Library for using CAN Communication (https://github.com/autowp/arduino-mcp2515/)
+ #include <ros.h>
+ #include <bharat/UI_display.h>
+
+
+///
+
+ ros::NodeHandle nh;
+
+// // //
+ 
+ bharat::UI_display infomsg;
+ ros::Publisher chatter("chatter",&infomsg);
+  
+struct can_frame canMsg;
+ 
+MCP2515 mcp2515(10);                 // SPI CS Pin 10
+ 
+ 
+void setup()
+{
+  Serial.begin(9600);                //Begins Serial Communication at 9600 baudrate
+  SPI.begin();                       //Begins SPI communication
+  delay(3000);
+  
+  //
+   nh.initNode();
+   nh.advertise(chatter);
+  
+ 
+  mcp2515.reset();
+  mcp2515.setBitrate(CAN_500KBPS, MCP_8MHZ); //Sets CAN at speed 500KBPS and Clock 8MHz
+  mcp2515.setNormalMode();                  //Sets CAN at normal mode
+}
+ 
+ 
+void loop()
+{
+  //Serial.println("shhhhhhh");
+  MCP2515::ERROR readMessage(struct can_frame *canMsg);
+  if (mcp2515.readMessage(&canMsg) == MCP2515::ERROR_OK) // To receive data (Poll Read)
+  {
+    
+  
+    
+  // Serial.print(canMsg.can_id,HEX);
+   int z= canMsg.can_id & 0xFF;
+   if(z==64){                         // motor controller  // 64 320 576 832 1088
+   int s=canMsg.can_id & 0xFFF;
+
+//  if (canMsg.can_id & CAN_EFF_FLAG) {  
+//       Serial.print(" (extended)");
+//     }
+    // Serial.print("  DLC: ");
+    // Serial.print(canMsg.can_dlc);  
+    // Serial.print("  Data: ");
+    // for (int i = 0; i < canMsg.can_dlc; i++) {  
+    //   Serial.print(canMsg.data[i]);
+    //   Serial.print(" ");
+    // }
+    if(s==64)
+    {
+      Serial.print("inpv: ");
+      float inpv=((canMsg.data[6]*256)+canMsg.data[7]);
+      inpv=inpv/10;
+      infomsg.battery_voltage=inpv;
+      Serial.print(inpv);
+      Serial.print(" ");
+      Serial.print("duty: ");
+      float duty=((canMsg.data[4]*256)+canMsg.data[5]);
+      duty=duty/10;
+      //add duty in rpm rn
+      infomsg.rpm=duty;
+
+      Serial.print(duty);
+      Serial.print(" ");
+    }
+    if(s==576)
+    {
+      Serial.print("ctemp: ");
+      float ctemp=((canMsg.data[0]*256)+canMsg.data[1]);
+      ctemp=ctemp/10;
+      infomsg.motor_controller_temp=ctemp;
+      Serial.print(ctemp);
+      Serial.print(" ");
+        Serial.print("mtemp: ");
+      float mtemp=((canMsg.data[2]*256)+canMsg.data[3]);
+      mtemp=mtemp/10;
+      infomsg.motor_temp=mtemp;
+      Serial.print(mtemp);
+      Serial.print(" ");
+    }
+    
+    Serial.println();
+    chatter.publish(&infomsg);
+    nh.spinOnce();
+  }
+  // Serial.println(1);
+   
+   else{
+   for(int i=0;i<8;i++)
+    {
+     //if(canMsg.can_id==64)
+      
+      
+//       Serial.print(" ");
+//        Serial.print(i);
+//     Serial.print("->");
+     int  k=canMsg.data[i];
+  //Serial.println(k);
+   if(i==1)
+    Serial.println(k);
+     if(i==2)
+    Serial.println(k);
+         if(i==3)
+   // Serial.println(k);  
+    if(i==5 && 0)
+    Serial.println(k);
+    if(i==1){
+    k/=10;
+     // Serial.println(k);
+      // Serial.print(canMsg.data[i]);
+
+    }
+    else 
+    if (i==3 && 0)
+    {
+      int errc=0;
+      while(errc<8)
+      {
+        int ch=k&1;
+       // Serial.print(ch);
+        if(ch)
+        {
+          switch(errc)
+          {
+            case 0:Serial.println("Charge limit enforcement fault");break;
+            case 1:Serial.println("Input power supply fault");break;
+            case 2:Serial.println("High voltage isolation fault");break;
+            case 3:Serial.println("Redundamt power supply fault");break;
+            case 4:Serial.println("External communication fault");break;
+            case 5:Serial.println("Thermistor fault");break;
+            case 6:Serial.println("Fan monitor fault");break;
+            case 7:Serial.println("Weak pack fault");break;
+            
+          }
+        }
+        errc++;
+        k/=2;
+      }
+    }
+    else if (i==2 && 0)
+    {
+      int errc=0;
+      while(errc<8)
+      {
+        int ch=k&1;
+       // Serial.print(ch);
+        if(ch)
+        {
+          switch(errc)
+          {
+            case 0:Serial.println("Cell ASIC fault");break;
+            case 1:Serial.println("Highest cell voltage over 5V");break;
+            case 2:Serial.println("Current sensor fault");break;
+            case 3:Serial.println("Open wiring fault");break;
+            case 4:Serial.println("Low cell voltage fault");break;
+            case 5:Serial.println("Weak cell fault");break;
+            case 6:Serial.println("Cell balancing stuck off fault");break;
+            case 7:Serial.println("Internal communication fault");break;
+            
+          }
+        }
+        errc++;
+        k/=2;
+      }
+    }
+    //Serial.println("grr");
+    }
+   }
+  
+
+  // /*  Serial.print(0);
+  //   Serial.print(" ");
+  //     Serial.println(canMsg.data[1]);*/
+    
+    
+  // //  Serial.println(x);
+  //Serial.println(" brr  "); 
+    delay(1000);
+ }
+  
+  //Serial.println("  hhh  "); 
+  delay(100);
+}
